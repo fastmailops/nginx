@@ -30,6 +30,7 @@ static int ngx_ssl_new_client_session(ngx_ssl_conn_t *ssl_conn,
 #ifdef SSL_READ_EARLY_DATA_SUCCESS
 static ngx_int_t ngx_ssl_try_early_data(ngx_connection_t *c);
 #endif
+void ngx_ssl_handshake_log(ngx_connection_t *c);
 static void ngx_ssl_handshake_handler(ngx_event_t *ev);
 #ifdef SSL_READ_EARLY_DATA_SUCCESS
 static ssize_t ngx_ssl_recv_early(ngx_connection_t *c, u_char *buf,
@@ -1772,9 +1773,7 @@ ngx_ssl_handshake(ngx_connection_t *c)
             return NGX_ERROR;
         }
 
-#if (NGX_DEBUG)
         ngx_ssl_handshake_log(c);
-#endif
 
         c->recv = ngx_ssl_recv;
         c->send = ngx_ssl_write;
@@ -1939,9 +1938,7 @@ ngx_ssl_try_early_data(ngx_connection_t *c)
             return NGX_ERROR;
         }
 
-#if (NGX_DEBUG)
         ngx_ssl_handshake_log(c);
-#endif
 
         c->ssl->try_early_data = 0;
 
@@ -2046,8 +2043,6 @@ ngx_ssl_try_early_data(ngx_connection_t *c)
 #endif
 
 
-#if (NGX_DEBUG)
-
 void
 ngx_ssl_handshake_log(ngx_connection_t *c)
 {
@@ -2084,22 +2079,20 @@ ngx_ssl_handshake_log(ngx_connection_t *c)
 
         *d = '\0';
 
-        ngx_log_debug2(NGX_LOG_DEBUG_EVENT, c->log, 0,
-                       "SSL: %s, cipher: \"%s\"",
-                       SSL_get_version(c->ssl->connection), &buf[1]);
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                      "SSL: %s, cipher: \"%s\"",
+                      SSL_get_version(c->ssl->connection), &buf[1]);
 
         if (SSL_session_reused(c->ssl->connection)) {
-            ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, 0,
-                           "SSL reused session");
+            ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                          "SSL reused session");
         }
 
     } else {
-        ngx_log_debug0(NGX_LOG_DEBUG_EVENT, c->log, 0,
-                       "SSL no shared ciphers");
+        ngx_log_error(NGX_LOG_INFO, c->log, 0,
+                      "SSL no shared ciphers");
     }
 }
-
-#endif
 
 
 static void
