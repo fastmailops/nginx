@@ -2125,6 +2125,7 @@ static void
 ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
     ngx_uint_t do_write)
 {
+    off_t              sent;
     ngx_int_t          rc;
     ngx_connection_t  *c;
 
@@ -2140,6 +2141,12 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
     if (!u->request_sent && ngx_http_upstream_test_connect(c) != NGX_OK) {
         ngx_http_upstream_next(r, u, NGX_HTTP_UPSTREAM_FT_ERROR);
         return;
+    }
+
+    sent = c->sent;
+
+    if (!u->request_sent) {
+        sent = -1;
     }
 
     c->log->action = "sending request to upstream";
@@ -2158,7 +2165,9 @@ ngx_http_upstream_send_request(ngx_http_request_t *r, ngx_http_upstream_t *u,
 
     if (rc == NGX_AGAIN) {
         if (!c->write->ready || u->request_body_blocked) {
-            ngx_add_timer(c->write, u->conf->send_timeout);
+            if (c->sent != sent || !c->write->timer_set) {
+                ngx_add_timer(c->write, u->conf->send_timeout);
+            }
 
         } else if (c->write->timer_set) {
             ngx_del_timer(c->write);
@@ -3643,6 +3652,7 @@ static void
 ngx_http_upstream_process_upgraded(ngx_http_request_t *r,
     ngx_uint_t from_upstream, ngx_uint_t do_write)
 {
+    off_t                      dsent, usent;
     size_t                     size;
     ssize_t                    n;
     ngx_buf_t                 *b;
@@ -3659,6 +3669,9 @@ ngx_http_upstream_process_upgraded(ngx_http_request_t *r,
 
     downstream = c;
     upstream = u->peer.connection;
+
+    dsent = downstream->sent;
+    usent = upstream->sent;
 
     if (downstream->write->timedout) {
         c->timedout = 1;
@@ -3779,7 +3792,9 @@ ngx_http_upstream_process_upgraded(ngx_http_request_t *r,
     }
 
     if (upstream->write->active && !upstream->write->ready) {
-        ngx_add_timer(upstream->write, u->conf->send_timeout);
+        if (upstream->sent != usent || !upstream->write->timer_set) {
+            ngx_add_timer(upstream->write, u->conf->send_timeout);
+        }
 
     } else if (upstream->write->timer_set) {
         ngx_del_timer(upstream->write);
@@ -3824,7 +3839,9 @@ ngx_http_upstream_process_upgraded(ngx_http_request_t *r,
     }
 
     if (downstream->write->active && !downstream->write->ready) {
-        ngx_add_timer(downstream->write, clcf->send_timeout);
+        if (downstream->sent != dsent || !downstream->write->timer_set) {
+            ngx_add_timer(downstream->write, clcf->send_timeout);
+        }
 
     } else if (downstream->write->timer_set) {
         ngx_del_timer(downstream->write);
@@ -3886,6 +3903,7 @@ static void
 ngx_http_upstream_process_non_buffered_request(ngx_http_request_t *r,
     ngx_uint_t do_write)
 {
+    off_t                      sent;
     size_t                     size;
     ssize_t                    n;
     ngx_buf_t                 *b;
@@ -3898,6 +3916,8 @@ ngx_http_upstream_process_non_buffered_request(ngx_http_request_t *r,
     u = r->upstream;
     downstream = r->connection;
     upstream = u->peer.connection;
+
+    sent = downstream->sent;
 
     b = &u->buffer;
 
@@ -3988,7 +4008,9 @@ ngx_http_upstream_process_non_buffered_request(ngx_http_request_t *r,
     }
 
     if (downstream->write->active && !downstream->write->ready) {
-        ngx_add_timer(downstream->write, clcf->send_timeout);
+        if (downstream->sent != sent || !downstream->write->timer_set) {
+            ngx_add_timer(downstream->write, clcf->send_timeout);
+        }
 
     } else if (downstream->write->timer_set) {
         ngx_del_timer(downstream->write);
