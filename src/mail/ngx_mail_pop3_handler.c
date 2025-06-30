@@ -193,6 +193,7 @@ ngx_mail_pop3_auth_state(ngx_event_t *rev)
 
             case NGX_POP3_QUIT:
                 s->quit = 1;
+                s->no_lingering_close = 1;
                 break;
 
             case NGX_POP3_NOOP:
@@ -223,6 +224,7 @@ ngx_mail_pop3_auth_state(ngx_event_t *rev)
 
             case NGX_POP3_QUIT:
                 s->quit = 1;
+                s->no_lingering_close = 1;
                 break;
 
             case NGX_POP3_NOOP:
