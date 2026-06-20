@@ -1091,6 +1091,11 @@ ngx_mail_send(ngx_event_t *wev)
             delay = (ngx_msec_t) (excess * 1000 / cscf->limit_rate + 1);
             ngx_add_timer(wev, delay);
 
+            if (s->quit) {
+                c->read->handler = ngx_mail_block_read;
+                c->write->handler = ngx_mail_send;
+            }
+
             if (ngx_handle_write_event(wev, 0) != NGX_OK) {
                 ngx_mail_close_connection(c);
             }
